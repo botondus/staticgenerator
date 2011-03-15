@@ -236,12 +236,14 @@ class StaticGenerator(object):
                 self.fs.remove(filename)
         except:
             raise StaticGeneratorException('Could not delete file: %s' % filename)
-        try:
-            self.fs.rmdir(directory)
-        except OSError:
-            # Will fail if a directory is not empty, in which case we don't 
-            # want to delete it anyway
-            pass
+
+        if directory != self.web_root.rstrip(os.sep):
+            try:
+                self.fs.rmdir(directory)
+            except OSError:
+                # Will fail if a directory is not empty, in which case we don't 
+                # want to delete it anyway
+                pass
 
     def do_all(self, func):
         return [func(path) for path in self.resources]
