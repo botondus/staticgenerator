@@ -59,7 +59,7 @@ class StaticGenerator(object):
         settings = kw.get('settings', None)
         site = kw.get('site', None)
         fs = kw.get('fs', None)
-        
+
         self.http_request = http_request
         if not http_request:
             from django.http import HttpRequest
@@ -168,15 +168,39 @@ class StaticGenerator(object):
 
         return response.content
 
+    def segment_path(self, path, level):
+        tmp_path = path.split('/')
+        print tmp_path
+        if path == '/':
+            return path
+        print path
+        if path.endswith('/'):
+            tmp_path = tmp_path[:-1]
+        print tmp_path
+        base_path = '/'.join(tmp_path[:-1])
+        print 'base_path: %s' % base_path
+        last_section = tmp_path[-1]
+        print 'last_section: %s' % last_section
+        segments = [chr for ix, chr in enumerate(last_section) if ix < level]
+        print 'segments: %s' % segments
+        print 'segments2: %s' % '/'.join(segments)
+        print last_section[level:]
+        return self.fs.join(base_path, '/'.join(segments), last_section[level:], '/' if path.endswith('/') else '')
+
     def get_filename_from_path(self, path):
         """
         Returns (filename, directory)
         Creates index.html for path if necessary
         """
+        print 'original path: %s' % path
+        path = self.segment_path(path, 3)
+        print 'path1: %s' % path
         if path.endswith('/'):
             path = '%sindex.html' % path
+        print 'path2: %s' % path
 
         filename = self.fs.join(self.web_root, path.lstrip('/')).encode('utf-8')
+        print 'filename: %s' % filename
         return filename, self.fs.dirname(filename)
 
     def publish_from_path(self, path, content=None):
