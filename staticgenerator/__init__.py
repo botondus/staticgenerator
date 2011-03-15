@@ -3,6 +3,7 @@
 
 """Static file generator for Django."""
 import stat
+import os
 
 from django.utils.functional import Promise
 
@@ -49,6 +50,9 @@ class StaticGenerator(object):
             self.web_root = getattr(self.settings, 'WEB_ROOT')
         except AttributeError:
             raise StaticGeneratorException('You must specify WEB_ROOT in settings.py')
+
+        self.cache_segmentation = getattr(self.settings, 'STATICGENERATOR_CACHE_SEGMENTATION', 0)
+
 
     def parse_dependencies(self, kw):
         http_request = kw.get('http_request', None)
@@ -169,38 +173,35 @@ class StaticGenerator(object):
         return response.content
 
     def segment_path(self, path, level):
-        tmp_path = path.split('/')
-        print tmp_path
-        if path == '/':
+        has_trailing_slash = path.endswith(os.sep)
+        tmp_path = path.split(os.sep)
+        if path == os.sep:
             return path
-        print path
-        if path.endswith('/'):
+        if has_trailing_slash:
             tmp_path = tmp_path[:-1]
-        print tmp_path
-        base_path = '/'.join(tmp_path[:-1])
-        print 'base_path: %s' % base_path
+        base_path = os.sep.join(tmp_path[:-1])
         last_section = tmp_path[-1]
-        print 'last_section: %s' % last_section
-        segments = [chr for ix, chr in enumerate(last_section) if ix < level]
-        print 'segments: %s' % segments
-        print 'segments2: %s' % '/'.join(segments)
-        print last_section[level:]
-        return self.fs.join(base_path, '/'.join(segments), last_section[level:], '/' if path.endswith('/') else '')
+        segments = [chr for ix, chr in enumerate(last_section) if ix < (level - 1)]
+        segmented_path = self.fs.join(base_path, os.sep.join(segments), last_section[(level - 1):])
+        if has_trailing_slash:
+            segmented_path += os.sep
+        return segmented_path
 
     def get_filename_from_path(self, path):
         """
         Returns (filename, directory)
         Creates index.html for path if necessary
         """
-        print 'original path: %s' % path
-        path = self.segment_path(path, 3)
-        print 'path1: %s' % path
+#        print 'original path: %s' % path
+        if self.cache_segmentation > 0:
+            path = self.segment_path(path, self.cache_segmentation)
+#        print 'path1: %s' % path
         if path.endswith('/'):
             path = '%sindex.html' % path
-        print 'path2: %s' % path
+#        print 'path2: %s' % path
 
         filename = self.fs.join(self.web_root, path.lstrip('/')).encode('utf-8')
-        print 'filename: %s' % filename
+#        print 'filename: %s' % filename
         return filename, self.fs.dirname(filename)
 
     def publish_from_path(self, path, content=None):
@@ -235,7 +236,6 @@ class StaticGenerator(object):
                 self.fs.remove(filename)
         except:
             raise StaticGeneratorException('Could not delete file: %s' % filename)
-
         try:
             self.fs.rmdir(directory)
         except OSError:
